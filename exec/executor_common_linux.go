@@ -155,22 +155,53 @@ func execForHangAction(uid string, ctx context.Context, expModel *spec.ExpModel,
 
 	log.Debugf(ctx, "cgroup root path %s", cgroupRoot)
 
-	control, err := cgroups.Load(osexec.Hierarchy(cgroupRoot), osexec.PidPath(int(pid)))
-	if err != nil {
-		sprintf := fmt.Sprintf("cgroups load failed, %s", err.Error())
-		return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+	isCgroupV2 := false
+	if _, err := os.Stat(fmt.Sprintf("%s/cgroup.controllers", cgroupRoot)); err == nil {
+		isCgroupV2 = true
 	}
-
-	if err := command.Start(); err != nil {
-		sprintf := fmt.Sprintf("command start failed, %s", err.Error())
-		return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
-	}
-
-	// add target cgroups
-	if err = control.Add(cgroups.Process{Pid: command.Process.Pid}); err != nil {
-		if err := command.Process.Kill(); err != nil {
-			sprintf := fmt.Sprintf("create experiment failed, %v", err)
+	if isCgroupV2 {
+		g, err := cgroupsv2.PidGroupPath(pid)
+		if err != nil {
+			logrus.WithError(err).Errorf("loading cgroup2 for %d", pid)
+			return container, nil
+		}
+		cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup/", g)
+		if err != nil {
+			if err != cgroupsv2.ErrCgroupDeleted {
+				sprintf := fmt.Sprintf("cgroups V2 load failed, %s", err.Error())
+				return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+			}
+			if cg, err = cgroupsv2.NewManager("/sys/fs/cgroup", cgroupRoot, nil); err != nil {
+				sprintf := fmt.Sprintf("cgroups V2 new manager failed, %s", err.Error())
+				return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+			}
+		}
+		if err := command.Start(); err != nil {
+			sprintf := fmt.Sprintf("command start failed, %s", err.Error())
 			return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+		}
+		if err := cg.AddProc(uint64(command.Process.Pid)); err != nil {
+			if err := command.Process.Kill(); err != nil {
+				sprintf := fmt.Sprintf("add process to cgroups V2 failed, %s", err.Error())
+				return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+			}
+		}
+	} else {
+		control, err := cgroups.Load(osexec.Hierarchy(cgroupRoot), osexec.PidPath(int(pid)))
+		if err != nil {
+			sprintf := fmt.Sprintf("cgroups V1 load failed, %s", err.Error())
+			return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+		}
+		if err := command.Start(); err != nil {
+			sprintf := fmt.Sprintf("command start failed, %s", err.Error())
+			return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+		}
+		// add target cgroups
+		if err = control.Add(cgroups.Process{Pid: command.Process.Pid}); err != nil {
+			if err := command.Process.Kill(); err != nil {
+				sprintf := fmt.Sprintf("create experiment failed, %v", err)
+				return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+			}
 		}
 	}
 
