@@ -160,10 +160,10 @@ func execForHangAction(uid string, ctx context.Context, expModel *spec.ExpModel,
 		isCgroupV2 = true
 	}
 	if isCgroupV2 {
-		g, err := cgroupsv2.PidGroupPath(pid)
+		g, err := cgroupsv2.PidGroupPath(int(pid))
 		if err != nil {
-			logrus.WithError(err).Errorf("loading cgroup2 for %d", pid)
-			return container, nil
+			sprintf := fmt.Sprintf("loading cgroup2 for %d, err ", pid, err.Error())
+			return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
 		}
 		cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup/", g)
 		if err != nil {
