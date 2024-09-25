@@ -24,7 +24,5 @@ jobs:
     - name: Build
       run: make build
 
-    - name: Release
-      run: make release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+    - name: Display the release tag
+      run: echo ${{ github.event.release.tag_name }}
