@@ -33,6 +33,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
 )
 
 // CommonExecutor is an executor implementation which used copy chaosblade tool to the target container and executed
