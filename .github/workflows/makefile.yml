@@ -1,0 +1,30 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v1.7.4'  
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.20'
+
+    - name: Install dependencies
+      run: go mod tidy
+
+    - name: Build
+      run: make build
+
+    - name: Release
+      run: make release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
